@@ -8,7 +8,6 @@
 
 #import <AdSupport/AdSupport.h>
 
-#import <FBAEMKit/FBAEMKit.h>
 #import <FBSDKCoreKit/FBSDKCoreKit.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 @import TestTools;
@@ -17,9 +16,9 @@
 
 #import "AppEventsATEPublisher+Testing.h"
 #import "CodelessIndexer+Testing.h"
-#import "FBAEMReporter+Testing.h"
 #import "FBSDKAccessToken+Internal.h"
 #import "FBSDKAccessToken+Testing.h"
+#import "FBSDKAEMManager+Testing.h"
 #import "FBSDKAdvertisingTrackingStatus.h"
 #import "FBSDKAppEventName+Internal.h"
 #import "FBSDKAppEventParameterName+Internal.h"
@@ -27,11 +26,8 @@
 #import "FBSDKAppEventsATEPublisher.h"
 #import "FBSDKAppEventsConfiguration+Testing.h"
 #import "FBSDKAppEventsConfigurationManager+Testing.h"
-#import "FBSDKAppEventsConfigurationProtocol.h"
 #import "FBSDKAppEventsNumberParser.h"
 #import "FBSDKAppEventsUtility+Testing.h"
-#import "FBSDKAppLinkNavigation+Testing.h"
-#import "FBSDKAppLinkResolverRequestBuilder.h"
 #import "FBSDKAppLinkUtility+Testing.h"
 #import "FBSDKAppURLSchemeProviding.h"
 #import "FBSDKApplicationLifecycleNotifications.h"
@@ -66,6 +62,8 @@
 #import "FBSDKGraphRequestConnecting.h"
 #import "FBSDKGraphRequestConnection+Internal.h"
 #import "FBSDKGraphRequestConnection+Testing.h"
+#import "FBSDKDomainConfigurationManager+Testing.h"
+#import "FBSDKDomainHandler+Testing.h"
 #import "FBSDKGraphRequestConnectionFactory.h"
 #import "FBSDKGraphRequestConnectionFactoryProtocol.h"
 #import "FBSDKGraphRequestFactory.h"
@@ -88,14 +86,13 @@
 #import "FBSDKRestrictiveDataFilterManager+Testing.h"
 #import "FBSDKSKAdNetworkConversionConfiguration.h"
 #import "FBSDKSKAdNetworkReporter.h"
+#import "FBSDKSKAdNetworkReporterV2.h"
 #import "FBSDKSKAdNetworkReporter+Testing.h"
+#import "FBSDKSKAdNetworkReporterV2+Testing.h"
 #import "FBSDKSKAdNetworkRule.h"
 #import "FBSDKServerConfiguration+Internal.h"
 #import "FBSDKServerConfigurationManager+Testing.h"
-#import "FBSDKSettings+Internal.h"
-#import "FBSDKSettings+Testing.h"
 #import "FBSDKSettingsLogging.h"
-#import "FBSDKSettingsProtocol.h"
 #import "FBSDKTimeSpentData+Testing.h"
 #import "FBSDKURL+Internal.h"
 #import "FBSDKURLOpener.h"
@@ -109,15 +106,13 @@
 #import "SuggestedEventsIndexer+Testing.h"
 #import "UIApplication+URLOpener.h"
 #import "WebViewAppLinkResolver+Testing.h"
+#import "FBSDKDomainConfiguration+Internal.h"
+#import "FBSDKDomainConfigurationManager+Testing.h"
+#import "FBSDKGraphRequestQueue+Testing.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 // Categories needed to expose private methods to Swift
-
-// Needed to expose this private method to AppLinkResolverRequestBuilderTests
-@interface FBSDKAppLinkResolverRequestBuilder (FBSDKAppLinkResolverTests)
-- (instancetype)initWithUserInterfaceIdiom:(UIUserInterfaceIdiom)userInterfaceIdiom;
-@end
 
 // Needed to expose private methods to the ServerConfigurationFixtures class
 @interface FBSDKServerConfiguration (ServerConfigurationFixtures)

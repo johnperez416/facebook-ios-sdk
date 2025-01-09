@@ -6,15 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#import <FBSDKCoreKit/FBSDKAppEventsConfigurationManager.h>
-
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
-
-#import "FBSDKAppEventsConfiguration.h"
-#import "FBSDKGraphRequestConnecting.h"
-#import "FBSDKGraphRequestConnectionFactory.h"
-#import "FBSDKGraphRequestFactoryProtocol.h"
-#import "FBSDKSettingsProtocol.h"
+#import <UIKit/UIKit.h>
 
 static NSString *const FBSDKAppEventsConfigurationKey = @"com.facebook.sdk:FBSDKAppEventsConfiguration";
 static NSString *const FBSDKAppEventsConfigurationTimestampKey = @"com.facebook.sdk:FBSDKAppEventsConfigurationTimestamp";
@@ -96,10 +90,15 @@ static FBSDKAppEventsConfigurationManager *_shared;
       return;
     }
     self.isLoadingConfiguration = true;
+    
     id<FBSDKGraphRequest> request = [self.graphRequestFactory createGraphRequestWithGraphPath:appID
                                                                                    parameters:@{
                                        @"fields" : [NSString stringWithFormat:@"app_events_config.os_version(%@)", UIDevice.currentDevice.systemVersion]
-                                     }];
+                                     }
+                                                                                  tokenString:nil
+                                                                                   HTTPMethod:FBSDKHTTPMethodGET
+                                                                                        flags:FBSDKGraphRequestFlagNone
+                                                            useAlternativeDefaultDomainPrefix:NO];
     id<FBSDKGraphRequestConnecting> requestConnection = [self.graphRequestConnectionFactory createGraphRequestConnection];
     requestConnection.timeout = kTimeout;
     [requestConnection addRequest:request completion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {

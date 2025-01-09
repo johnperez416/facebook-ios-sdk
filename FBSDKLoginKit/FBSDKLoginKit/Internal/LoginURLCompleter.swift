@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import FBSDKCoreKit
 import FBSDKCoreKit_Basics
 import Foundation
@@ -118,7 +116,8 @@ struct LoginURLCompleter: LoginCompleting {
       if let token = token {
         parameters.authenticationToken = token
         if let claims = token.claims() {
-          parameters.profile = self.profile(with: claims)
+          let permissionsStringSet = FBPermission.rawPermissions(from: parameters.permissions ?? Set<FBPermission>())
+          parameters.profile = self.profile(with: claims, permissions: permissionsStringSet)
         }
       } else {
         parameters.error = dependencies.errorFactory.error(
@@ -138,6 +137,7 @@ struct LoginURLCompleter: LoginCompleting {
     parameters.nonceString = values["nonce"] as? String
     parameters.authenticationTokenString = values["id_token"] as? String
     parameters.code = values["code"] as? String
+    parameters.userTokenNonce = values["user_token_nonce"] as? String
 
     let grantedPermissionsString = values["granted_scopes"] as? String ?? ""
     let declinedPermissionsString = values["denied_scopes"] as? String ?? ""
@@ -304,7 +304,7 @@ struct LoginURLCompleter: LoginCompleting {
     }
   }
 
-  func profile(with claims: AuthenticationTokenClaims) -> Profile? {
+  func profile(with claims: AuthenticationTokenClaims, permissions: Set<String>?) -> Profile? {
     guard
       !claims.sub.isEmpty,
       let profileFactory = try? Self.getDependencies().profileFactory
@@ -340,6 +340,7 @@ struct LoginURLCompleter: LoginCompleting {
       hometown: Location(from: claims.userHometown ?? [:]),
       location: Location(from: claims.userLocation ?? [:]),
       gender: claims.userGender,
+      permissions: permissions,
       isLimited: true
     )
   }
@@ -435,5 +436,3 @@ extension LoginURLCompleter: DependentAsType {
     errorFactory: _ErrorFactory()
   )
 }
-
-#endif

@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import Foundation
 
 final class AEMNetworker: NSObject, AEMNetworking {
@@ -23,7 +21,8 @@ final class AEMNetworker: NSObject, AEMNetworking {
       parameters: parameters,
       tokenString: tokenString,
       httpMethod: method,
-      flags: [.skipClientToken, .disableErrorRecovery]
+      flags: [.skipClientToken, .disableErrorRecovery],
+      useAlternativeDefaultDomainPrefix: false
     )
 
     graphRequest.start { _, result, error in
@@ -31,5 +30,3 @@ final class AEMNetworker: NSObject, AEMNetworking {
     }
   }
 }
-
-#endif

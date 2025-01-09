@@ -6,6 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+@testable import FBAEMKit
 @testable import FBSDKCoreKit
 
 import XCTest
@@ -55,10 +56,8 @@ final class CoreKitConfiguratorTests: XCTestCase {
     InternalUtility.reset()
     _ServerConfigurationManager.shared.reset()
     Settings.shared.reset()
-
-    // Non-tvOS
     AEMReporter.reset()
-    AppLinkNavigation.reset()
+    AppLinkNavigation.resetDependencies()
     AppLinkURL.reset()
     AppLinkUtility.reset()
     _AuthenticationStatusUtility.resetClassDependencies()
@@ -69,9 +68,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
     _FeatureExtractor.reset()
     _ModelManager.reset()
     Profile.resetDependencies()
+    _AEMManager.shared.reset()
+    GraphRequestQueue.sharedInstance().reset()
+    _DomainConfigurationManager.sharedInstance().reset()
   }
-
-  // MARK: - All Platforms
 
   func testConfiguringAccessToken() {
     XCTAssertNil(
@@ -189,6 +189,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
       AppEvents.shared.internalUtility,
       "AppEvents should not have an internal utility by default"
     )
+    XCTAssertNil(
+      AppEvents.shared.sensitiveParamsManager,
+      "AppEvents should not have a sensitiveParamsManager by default"
+    )
 
     configurator.performConfiguration()
 
@@ -268,6 +272,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
       AppEvents.shared.internalUtility === components.internalUtility,
       "AppEvents should be configured with the internal utility"
     )
+    XCTAssertTrue(
+      AppEvents.shared.sensitiveParamsManager === components.sensitiveParamsManager,
+      "AppEvents should be configured with sensitiveParamsManager"
+    )
   }
 
   func testConfiguringNonTVAppEvents() {
@@ -281,6 +289,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
     )
     XCTAssertNil(
       AppEvents.shared.skAdNetworkReporter,
+      "AppEvents should not have a StoreKit ad network reporter by default"
+    )
+    XCTAssertNil(
+      AppEvents.shared.skAdNetworkReporterV2,
       "AppEvents should not have a StoreKit ad network reporter by default"
     )
     XCTAssertNil(
@@ -309,6 +321,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
     XCTAssertTrue(
       AppEvents.shared.skAdNetworkReporter === components.skAdNetworkReporter,
       "AppEvents should be configured with StoreKit ad network reporter"
+    )
+    XCTAssertTrue(
+      AppEvents.shared.skAdNetworkReporterV2 === components.skAdNetworkReporterV2,
+      "AppEvents should be configured with StoreKit ad network reporter v2"
     )
     XCTAssertTrue(
       AppEvents.shared.codelessIndexer === components.codelessIndexer,
@@ -388,14 +404,22 @@ final class CoreKitConfiguratorTests: XCTestCase {
       _AppEventsState.eventProcessors,
       "_AppEventsState's event processors should be configured"
     )
-    XCTAssertEqual(processors.count, 2, "_AppEventsState should have two event processors")
+    XCTAssertEqual(processors.count, 4, "_AppEventsState should have three event processors")
     XCTAssertTrue(
-      processors.first === components.eventDeactivationManager,
+      processors[0] === components.eventDeactivationManager,
       "_AppEventsState's event processors should be configured with the event deactivation manager"
     )
     XCTAssertTrue(
-      processors.last === components.restrictiveDataFilterManager,
+      processors[1] === components.blocklistEventsManager,
+      "_AppEventsState's event processors should be configured with the blocklist events manager"
+    )
+    XCTAssertTrue(
+      processors[2] === components.restrictiveDataFilterManager,
       "_AppEventsState's event processors should be configured with the restrictive data filter manager"
+    )
+    XCTAssertTrue(
+      processors[3] === components.redactedEventsManager,
+      "_AppEventsState's event processors should be configured with the redacted events manager"
     )
   }
 
@@ -420,6 +444,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
       _AppEventsUtility.shared.errorFactory,
       "_AppEventsUtility should not have an error factory by default"
     )
+    XCTAssertNil(
+      _AppEventsUtility.shared.dataStore,
+      "_AppEventsUtility should not have an data store by default"
+    )
 
     configurator.performConfiguration()
 
@@ -443,6 +471,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
       _AppEventsUtility.shared.errorFactory,
       components.errorFactory,
       "_AppEventsUtility should be configured with the error factory"
+    )
+    XCTAssertTrue(
+      _AppEventsUtility.shared.dataStore === components.defaultDataStore,
+      "_AppEventsUtility should be configured with the data store"
     )
   }
 
@@ -792,45 +824,32 @@ final class CoreKitConfiguratorTests: XCTestCase {
     )
   }
 
-  func testConfiguringSettings() {
-    XCTAssertNil(
-      Settings.shared.store,
-      "Settings should not have a data store by default"
-    )
-    XCTAssertNil(
-      Settings.shared.appEventsConfigurationProvider,
-      "Settings should not have an app events configuration provider by default"
-    )
-    XCTAssertNil(
-      Settings.shared.infoDictionaryProvider,
-      "Settings should not have an info dictionary provider by default"
-    )
-    XCTAssertNil(
-      Settings.shared.eventLogger,
-      "Settings should not have an event logger by default"
-    )
-
+  func testConfiguringSettings() throws {
     configurator.performConfiguration()
 
-    XCTAssertTrue(
-      Settings.shared.store === components.defaultDataStore,
+    let dependencies = try Settings.shared.getDependencies()
+
+    XCTAssertIdentical(
+      dependencies.dataStore,
+      components.defaultDataStore,
       "Settings should be configured with the data store"
     )
-    XCTAssertTrue(
-      Settings.shared.appEventsConfigurationProvider === components.appEventsConfigurationProvider,
+    XCTAssertIdentical(
+      dependencies.appEventsConfigurationProvider,
+      components.appEventsConfigurationProvider,
       "Settings should be configured with the app events configuration provider"
     )
-    XCTAssertTrue(
-      Settings.shared.infoDictionaryProvider === components.infoDictionaryProvider,
+    XCTAssertIdentical(
+      dependencies.infoDictionaryProvider,
+      components.infoDictionaryProvider,
       "Settings should be configured with the info dictionary provider"
     )
-    XCTAssertTrue(
-      Settings.shared.eventLogger === components.eventLogger,
+    XCTAssertIdentical(
+      dependencies.eventLogger,
+      components.eventLogger,
       "Settings should be configured with the event logger"
     )
   }
-
-  // MARK: - Non-tvOS
 
   @available(iOS 14.0, *)
   func testConfiguringAEMReporter() {
@@ -865,23 +884,63 @@ final class CoreKitConfiguratorTests: XCTestCase {
     )
   }
 
+  @available(iOS 14.0, *)
+  func testConfiguringAEMManager() {
+    XCTAssertNil(
+      _AEMManager.shared.swizzler,
+      "AEMManager should not have a swizzler by default"
+    )
+    XCTAssertNil(
+      _AEMManager.shared.aemReporter,
+      "AEMManager should not have an AEM reporter by default"
+    )
+    XCTAssertNil(
+      _AEMManager.shared.eventLogger,
+      "AEMManager should not have an event logger by default"
+    )
+    XCTAssertNil(
+      _AEMManager.shared.crashHandler,
+      "AEMManager should not have a crash handler by default"
+    )
+    XCTAssertNil(
+      _AEMManager.shared.featureChecker,
+      "AEMManager should not have a feature checker by default"
+    )
+    XCTAssertNil(
+      _AEMManager.shared.appEventsUtility,
+      "AEMManager should not have a app events utility by default"
+    )
+
+    components.settings.appID = "sample"
+    configurator.performConfiguration()
+
+    XCTAssertTrue(
+      _AEMManager.shared.swizzler === components.swizzler,
+      "AEMManager should be configured with the swizzler"
+    )
+    XCTAssertTrue(
+      _AEMManager.shared.aemReporter === components.aemReporter,
+      "AEMManager should be configured with the AEM reporter"
+    )
+    XCTAssertTrue(
+      _AEMManager.shared.eventLogger === components.eventLogger,
+      "AEMManager should be configured with the event logger"
+    )
+    XCTAssertTrue(
+      _AEMManager.shared.crashHandler === components.crashHandler,
+      "AEMManager should be configured with the crash handler"
+    )
+    XCTAssertTrue(
+      _AEMManager.shared.featureChecker === components.featureChecker,
+      "AEMManager should be configured with the feature checker"
+    )
+    XCTAssertTrue(
+      _AEMManager.shared.appEventsUtility === components.appEventsUtility,
+      "AEMManager should be configured with the app events utility"
+    )
+  }
+
   func testConfiguringAppLinkNavigation() {
-    XCTAssertNil(
-      AppLinkNavigation.settings,
-      "AppLinkNavigation should not have settings by default"
-    )
-    XCTAssertNil(
-      AppLinkNavigation.urlOpener,
-      "AppLinkNavigation should not have an internal URL opener by default"
-    )
-    XCTAssertNil(
-      AppLinkNavigation.appLinkEventPoster,
-      "AppLinkNavigation should not have an app link event poster by default"
-    )
-    XCTAssertNil(
-      AppLinkNavigation.appLinkResolver,
-      "AppLinkNavigation should not have an app link resolver by default"
-    )
 
     configurator.performConfiguration()
 
@@ -1193,7 +1252,7 @@ final class CoreKitConfiguratorTests: XCTestCase {
     )
   }
 
-  func testConfiguringModelManager() {
+  func testConfiguringModelManager() throws {
     XCTAssertNil(
       _ModelManager.shared.featureChecker,
       "_ModelManager should not have a feature checker by default"
@@ -1211,8 +1270,8 @@ final class CoreKitConfiguratorTests: XCTestCase {
       "_ModelManager should not have a data store by default"
     )
     XCTAssertNil(
-      _ModelManager.shared.settings,
-      "_ModelManager should not have a settings by default"
+      _ModelManager.shared.getAppID,
+      "_ModelManager should not have an app ID computer by default"
     )
     XCTAssertNil(
       _ModelManager.shared.dataExtractor,
@@ -1230,6 +1289,9 @@ final class CoreKitConfiguratorTests: XCTestCase {
       _ModelManager.shared.featureExtractor,
       "_ModelManager should not have a feature extractor by default"
     )
+
+    let testSettings = try XCTUnwrap(components.settings as? TestSettings)
+    testSettings.appID = "test-app-id"
 
     configurator.performConfiguration()
 
@@ -1249,9 +1311,10 @@ final class CoreKitConfiguratorTests: XCTestCase {
       _ModelManager.shared.store === components.defaultDataStore,
       "_ModelManager should be configured with the default data store"
     )
-    XCTAssertTrue(
-      _ModelManager.shared.settings === components.settings,
-      "_ModelManager should be configured with the settings"
+    XCTAssertEqual(
+      _ModelManager.shared.getAppID?(),
+      "test-app-id",
+      "_ModelManager should be configured with an app ID computer"
     )
     XCTAssertTrue(
       _ModelManager.shared.dataExtractor === components.dataExtractor,
@@ -1331,6 +1394,68 @@ final class CoreKitConfiguratorTests: XCTestCase {
       FBWebDialogView.errorFactory,
       components.errorFactory,
       "FBWebDialogView should be configured with the error factory"
+    )
+  }
+
+  func testConfiguringDomainHandler() {
+    XCTAssertNil(
+      _DomainConfigurationManager.sharedInstance().settings,
+      "_DomainConfigurationManager should not have settings by default"
+    )
+    XCTAssertNil(
+      _DomainConfigurationManager.sharedInstance().dataStore,
+      "_DomainConfigurationManager should not have a dataStore by default"
+    )
+    XCTAssertNil(
+      _DomainConfigurationManager.sharedInstance().graphRequestFactory,
+      "_DomainConfigurationManager should not have a graphRequestFactory by default"
+    )
+    XCTAssertNil(
+      _DomainConfigurationManager.sharedInstance().graphRequestConnectionFactory,
+      "_DomainConfigurationManager should not have a graphRequestConnectionFactory by default"
+    )
+
+    configurator.performConfiguration()
+
+    XCTAssertTrue(
+      _DomainConfigurationManager.sharedInstance().settings === components.settings,
+      "Should be configured with the graph request connection factory"
+    )
+    XCTAssertTrue(
+      _DomainConfigurationManager.sharedInstance().dataStore === components.defaultDataStore,
+      "Should be configured with the graph request connection factory"
+    )
+    XCTAssertTrue(
+      _DomainConfigurationManager.sharedInstance().graphRequestFactory === components.graphRequestFactory,
+      "Should be configured with the graph request connection factory"
+    )
+    let connectionFactory = _DomainConfigurationManager.sharedInstance().graphRequestConnectionFactory
+    XCTAssertTrue(
+      connectionFactory === components.graphRequestConnectionFactory,
+      "Should be configured with the graph request connection factory"
+    )
+  }
+
+  func testConfiguringGraphRequestQueue() {
+    XCTAssertNil(
+      GraphRequestQueue.sharedInstance().graphRequestConnectionFactory,
+      "GraphRequestQueue should not have a graphRequestConnectionFactory by default"
+    )
+    guard let requests = GraphRequestQueue.sharedInstance().requestsQueue as? [GraphRequestMetadata] else {
+      XCTFail("GraphRequestQueue should be backed by [GraphRequestMetadata]")
+      return
+    }
+    XCTAssertTrue(
+      requests.isEmpty,
+      "GraphRequestQueue should have no requests by default"
+    )
+
+    configurator.performConfiguration()
+
+    let connectionFactory = GraphRequestQueue.sharedInstance().graphRequestConnectionFactory
+    XCTAssertTrue(
+      connectionFactory === components.graphRequestConnectionFactory,
+      "Should be configured with the graph request connection factory"
     )
   }
 }

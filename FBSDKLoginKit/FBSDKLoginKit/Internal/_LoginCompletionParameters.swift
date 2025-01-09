@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import FBSDKCoreKit
 import Foundation
 
@@ -39,6 +37,5 @@ public final class _LoginCompletionParameters: NSObject {
   public var dataAccessExpirationDate: Date?
   public var challenge: String?
   public var graphDomain: String?
+  public var userTokenNonce: String?
 }
-
-#endif

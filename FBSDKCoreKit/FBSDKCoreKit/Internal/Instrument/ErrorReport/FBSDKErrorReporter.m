@@ -8,6 +8,7 @@
 
 #import "FBSDKErrorReporter.h"
 
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 
 #import "FBSDKGraphRequest.h"
@@ -15,8 +16,6 @@
 #import "FBSDKGraphRequestFactory.h"
 #import "FBSDKInternalUtility+Internal.h"
 #import "FBSDKLogger.h"
-#import "FBSDKSettings+Internal.h"
-#import "FBSDKSettingsProtocol.h"
 
 #define FBSDK_MAX_ERROR_REPORT_LOGS 1000
 
@@ -124,7 +123,10 @@ NSString *const kFBSDKErrorTimestamp = @"timestamp";
   NSString *errorData = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
   id<FBSDKGraphRequest> request = [self.graphRequestFactory createGraphRequestWithGraphPath:[NSString stringWithFormat:@"%@/instruments", self.settings.appID]
                                                                                  parameters:@{@"error_reports" : errorData ?: @""}
-                                                                                 HTTPMethod:FBSDKHTTPMethodPOST];
+                                                                                tokenString:nil
+                                                                                 HTTPMethod:FBSDKHTTPMethodPOST
+                                                                                      flags:FBSDKGraphRequestFlagNone
+                                                          useAlternativeDefaultDomainPrefix:NO];
 
   [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
     if (!error && [result isKindOfClass:[NSDictionary<NSString *, id> class]] && result[@"success"]) {

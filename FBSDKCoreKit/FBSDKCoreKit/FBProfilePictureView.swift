@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import AppTrackingTransparency
 import UIKit
 
 /// A view to display a profile picture.
 @objcMembers
 @objc(FBSDKProfilePictureView)
-@available(tvOS, unavailable)
 public final class FBProfilePictureView: UIView {
 
   /// The mode for the receiver to determine the aspect ratio of the source image.
@@ -196,6 +196,17 @@ public final class FBProfilePictureView: UIView {
     }
 
     lastState = nil
+
+    // We don't want to reset the user picture in case the login shim solution is being used.
+    // The login shim flow doesn't provide a valid access token to fetch the image, it
+    // leverages limited login implementation
+    if #available(iOS 14, *) {
+      let trackingAuthorizationStatus = ATTrackingManager.trackingAuthorizationStatus
+      if trackingAuthorizationStatus != .authorized {
+        return
+      }
+    }
+
     updateImageWithAccessToken()
   }
 

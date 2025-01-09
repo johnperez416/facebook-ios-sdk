@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import FBSDKCoreKit
 import UIKit
 
@@ -313,9 +311,6 @@ public final class FBLoginButton: FBButton {
 
   func buttonPressed(_ sender: Any) {
     if isAuthenticated {
-      if loginTracking != .limited {
-        logTapEvent(withEventName: .loginButtonDidTap, parameters: nil)
-      }
 
       presentAlertViewController()
     } else {
@@ -342,10 +337,6 @@ public final class FBLoginButton: FBButton {
   private func logInUser() {
 
     let loginConfiguration = makeLoginConfiguration()
-
-    if loginTracking == .enabled {
-      logTapEvent(withEventName: .loginButtonDidTap, parameters: nil)
-    }
 
     if let loginConfiguration = loginConfiguration {
       loginProvider.logIn(
@@ -528,5 +519,3 @@ public final class FBLoginButton: FBButton {
     delegate?.loginButtonDidLogOut(self)
   }
 }
-
-#endif

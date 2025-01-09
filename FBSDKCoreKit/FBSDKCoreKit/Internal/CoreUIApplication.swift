@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import UIKit
 
 /**
@@ -17,7 +15,6 @@ import UIKit
  @warning INTERNAL - DO NOT USE
  */
 @objcMembers
-@available(tvOS, unavailable)
 @objc public final class CoreUIApplication: NSObject {
   public static let shared: _InternalURLOpener = {
     #if DEBUG
@@ -32,14 +29,10 @@ import UIKit
 private final class TestUIApplication: _InternalURLOpener {
   func canOpen(_ url: URL) -> Bool { false }
 
-  func open(_ url: URL) -> Bool { false }
-
   func open(
     _ url: URL,
     options: [UIApplication.OpenExternalURLOptionsKey: Any] = [:],
     completionHandler completion: ((Bool) -> Void)? = nil
   ) {}
 }
-#endif
-
 #endif

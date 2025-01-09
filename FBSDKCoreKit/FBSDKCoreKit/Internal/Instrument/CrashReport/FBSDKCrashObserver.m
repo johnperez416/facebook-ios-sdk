@@ -8,7 +8,7 @@
 
 #import "FBSDKCrashObserver+Internal.h"
 
-#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 
 #import "FBSDKFeatureChecking.h"
@@ -16,8 +16,6 @@
 #import "FBSDKGraphRequestHTTPMethod.h"
 #import "FBSDKGraphRequestProtocol.h"
 #import "FBSDKInternalUtility+Internal.h"
-#import "FBSDKSettings+Internal.h"
-#import "FBSDKSettingsProtocol.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -35,8 +33,7 @@ NS_ASSUME_NONNULL_BEGIN
     frameworks = @[@"FBSDKCoreKit",
                    @"FBSDKLoginKit",
                    @"FBSDKShareKit",
-                   @"FBSDKGamingServicesKit",
-                   @"FBSDKTVOSKit"];
+                   @"FBSDKGamingServicesKit"];
     _featureChecker = featureChecker;
     _graphRequestFactory = graphRequestFactory;
     _settings = settings;
@@ -63,7 +60,10 @@ NS_ASSUME_NONNULL_BEGIN
     [FBSDKInternalUtility.sharedUtility extendDictionaryWithDataProcessingOptions:parameters];
     id<FBSDKGraphRequest> request = [_graphRequestFactory createGraphRequestWithGraphPath:[NSString stringWithFormat:@"%@/instruments", [_settings appID]]
                                                                                parameters:parameters
-                                                                               HTTPMethod:FBSDKHTTPMethodPOST];
+                                                                              tokenString:nil
+                                                                               HTTPMethod:FBSDKHTTPMethodPOST
+                                                                                    flags:FBSDKGraphRequestFlagNone
+                                                        useAlternativeDefaultDomainPrefix:NO];
 
     [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
       if (!error && [result isKindOfClass:[NSDictionary<NSString *, id> class]] && result[@"success"]) {

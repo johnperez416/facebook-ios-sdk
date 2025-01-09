@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import Foundation
 
 /**
@@ -155,10 +153,8 @@ extension AppLinkResolver: DependentAsType {
   static var configuredDependencies: TypeDependencies?
 
   static var defaultDependencies: TypeDependencies? = TypeDependencies(
-    requestBuilder: _AppLinkResolverRequestBuilder(),
+    requestBuilder: AppLinkResolverRequestBuilder(),
     clientTokenProvider: Settings.shared,
     accessTokenProvider: AccessToken.self
   )
 }
-
-#endif
