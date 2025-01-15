@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import FBSDKCoreKit
 
 protocol ProfileCreating {
@@ -29,8 +27,7 @@ protocol ProfileCreating {
     hometown: Location?,
     location: Location?,
     gender: String?,
+    permissions: Set<String>?,
     isLimited: Bool
   ) -> Profile
 }
-
-#endif

@@ -6,10 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#import <FBSDKCoreKit/FBSDKGraphRequestConnecting.h>
-#import <FBSDKCoreKit/FBSDKLogger.h>
-#import <FBSDKCoreKit/FBSDKServerConfigurationManager.h>
-#import <FBSDKCoreKit/FBSDKSettings.h>
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 #import <objc/runtime.h>
 
@@ -42,6 +39,10 @@
 #define FBSDK_SERVER_CONFIGURATION_AAM_RULES_FIELD @"aam_rules"
 #define FBSDK_SERVER_CONFIGURATION_SUGGESTED_EVENTS_SETTING_FIELD @"suggested_events_setting"
 #define FBSDK_SERVER_CONFIGURATION_MONITORING_CONFIG_FIELD @"monitoringConfiguration"
+#define FBSDK_SERVER_CONFIGURATION_PROTECTED_MODE_RULES_FIELD @"protected_mode_rules"
+#define FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_DEFAULT_FIELD @"auto_log_app_events_default"
+#define FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_ENABLED_FIELD @"auto_log_app_events_enabled"
+
 
 @interface FBSDKServerConfigurationManager ()
 
@@ -231,6 +232,16 @@ typedef NS_OPTIONS(NSUInteger, FBSDKServerConfigurationManagerAppEventsFeatures)
     NSDictionary<NSString *, id> *restrictiveParams = [FBSDKBasicUtility objectForJSONString:resultDictionary[FBSDK_SERVER_CONFIGURATION_RESTRICTIVE_PARAMS_FIELD] error:nil];
     NSDictionary<NSString *, id> *AAMRules = [FBSDKBasicUtility objectForJSONString:resultDictionary[FBSDK_SERVER_CONFIGURATION_AAM_RULES_FIELD] error:nil];
     NSDictionary<NSString *, id> *suggestedEventsSetting = [FBSDKBasicUtility objectForJSONString:resultDictionary[FBSDK_SERVER_CONFIGURATION_SUGGESTED_EVENTS_SETTING_FIELD] error:nil];
+    NSDictionary<NSString *, id> *protectedModeRules = [FBSDKTypeUtility dictionaryValue:resultDictionary[FBSDK_SERVER_CONFIGURATION_PROTECTED_MODE_RULES_FIELD]];
+    NSMutableDictionary<NSString *, id> *migratedAutoLogValues = [NSMutableDictionary<NSString *, id> new];
+    if([resultDictionary.allKeys containsObject:FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_ENABLED_FIELD]) {
+      migratedAutoLogValues[FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_ENABLED_FIELD] = @([FBSDKTypeUtility boolValue:resultDictionary[FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_ENABLED_FIELD]]);
+    }
+    if([resultDictionary.allKeys containsObject:FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_DEFAULT_FIELD]) {
+      migratedAutoLogValues[FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_DEFAULT_FIELD] = @([FBSDKTypeUtility
+          boolValue:resultDictionary[FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_DEFAULT_FIELD]]);
+    }
+
     FBSDKServerConfiguration *serverConfiguration = [[FBSDKServerConfiguration alloc] initWithAppID:appID
                                                                                             appName:appName
                                                                                 loginTooltipEnabled:loginTooltipEnabled
@@ -255,24 +266,10 @@ typedef NS_OPTIONS(NSUInteger, FBSDKServerConfigurationManagerAppEventsFeatures)
                                                                                       eventBindings:eventBindings
                                                                                   restrictiveParams:restrictiveParams
                                                                                            AAMRules:AAMRules
-                                                                             suggestedEventsSetting:suggestedEventsSetting];
-  #if TARGET_OS_TV
-    // don't download icons more than once a day.
-    static const NSTimeInterval kSmartLoginIconsTTL = 60 * 60 * 24;
-
-    BOOL smartLoginEnabled = (smartLoginOptions & FBSDKServerConfigurationSmartLoginOptionsEnabled);
-    // for TVs go ahead and prime the images
-    if (smartLoginEnabled
-        && smartLoginMenuIconURL
-        && smartLoginBookmarkIconURL) {
-      [FBSDKImageDownloader.sharedInstance downloadImageWithURL:serverConfiguration.smartLoginBookmarkIconURL
-                                                            ttl:kSmartLoginIconsTTL
-                                                     completion:nil];
-      [FBSDKImageDownloader.sharedInstance downloadImageWithURL:serverConfiguration.smartLoginMenuIconURL
-                                                            ttl:kSmartLoginIconsTTL
-                                                     completion:nil];
-    }
-  #endif
+                                                                             suggestedEventsSetting:suggestedEventsSetting
+                                                                                 protectedModeRules:protectedModeRules
+                                                                              migratedAutoLogValues:migratedAutoLogValues.copy];
+  
     [self _didProcessConfigurationFromNetwork:serverConfiguration appID:appID error:nil];
   } @catch (NSException *exception) {}
 }
@@ -300,17 +297,15 @@ typedef NS_OPTIONS(NSUInteger, FBSDKServerConfigurationManagerAppEventsFeatures)
                                   FBSDK_SERVER_CONFIGURATION_LOGGIN_TOKEN_FIELD,
                                   FBSDK_SERVER_CONFIGURATION_RESTRICTIVE_PARAMS_FIELD,
                                   FBSDK_SERVER_CONFIGURATION_AAM_RULES_FIELD,
-                                  FBSDK_SERVER_CONFIGURATION_SUGGESTED_EVENTS_SETTING_FIELD
+                                  FBSDK_SERVER_CONFIGURATION_SUGGESTED_EVENTS_SETTING_FIELD,
+                                  FBSDK_SERVER_CONFIGURATION_PROTECTED_MODE_RULES_FIELD,
+                                  FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_DEFAULT_FIELD,
+                                  FBSDK_SERVER_CONFIGURATION_AUTO_LOG_APP_EVENTS_ENABLED_FIELD
                                 #if !TARGET_OS_TV
                                   , FBSDK_SERVER_CONFIGURATION_EVENT_BINDINGS_FIELD
                                 #endif
                                 #if DEBUG
                                   , FBSDK_SERVER_CONFIGURATION_UPDATE_MESSAGE_FIELD
-                                #endif
-                                #if TARGET_OS_TV
-                                  , FBSDK_SERVER_CONFIGURATION_SMART_LOGIN_OPTIONS_FIELD,
-                                  FBSDK_SERVER_CONFIGURATION_SMART_LOGIN_BOOKMARK_ICON_URL_FIELD,
-                                  FBSDK_SERVER_CONFIGURATION_SMART_LOGIN_MENU_ICON_URL_FIELD
                                 #endif
   ];
   NSDictionary<NSString *, NSString *> *parameters = @{ @"fields" : [fields componentsJoinedByString:@","],
@@ -320,7 +315,8 @@ typedef NS_OPTIONS(NSUInteger, FBSDKServerConfigurationManagerAppEventsFeatures)
                                                         parameters:parameters
                                                        tokenString:nil
                                                         HTTPMethod:nil
-                                                             flags:FBSDKGraphRequestFlagSkipClientToken | FBSDKGraphRequestFlagDisableErrorRecovery];
+                                                             flags:FBSDKGraphRequestFlagSkipClientToken | FBSDKGraphRequestFlagDisableErrorRecovery
+                                 useAlternativeDefaultDomainPrefix:NO];
 }
 
 - (void)_didProcessConfigurationFromNetwork:(FBSDKServerConfiguration *)serverConfiguration

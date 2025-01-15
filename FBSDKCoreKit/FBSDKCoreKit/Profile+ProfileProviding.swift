@@ -8,8 +8,6 @@
 
 import Foundation
 
-#if !os(tvOS)
-
 extension Profile: ProfileProviding {
   /// The current profile.
   @objc(currentProfile)
@@ -51,6 +49,7 @@ extension Profile: ProfileProviding {
       && hometown == other.hometown
       && location == other.location
       && gender == other.gender
+      && permissions == other.permissions
   }
 
   public static func fetchCachedProfile() -> Self? {
@@ -118,6 +117,11 @@ extension Profile: NSSecureCoding {
     let hometown = decoder.decodeObject(of: Location.self, forKey: CodingKeys.hometown.rawValue)
     let location = decoder.decodeObject(of: Location.self, forKey: CodingKeys.location.rawValue)
     let gender = decoder.decodeObject(of: NSString.self, forKey: CodingKeys.gender.rawValue)
+    let permissionsArray = decoder.decodeObject(
+      of: [NSArray.self, NSString.self],
+      forKey: CodingKeys.permissions.rawValue
+    ) as? [String]
+    let permissions = Set(permissionsArray ?? [])
 
     self.init(
       userID: identifier,
@@ -135,7 +139,8 @@ extension Profile: NSSecureCoding {
       hometown: hometown,
       location: location,
       gender: gender as String?,
-      isLimited: isLimited
+      isLimited: isLimited,
+      permissions: permissions
     )
   }
 
@@ -156,6 +161,7 @@ extension Profile: NSSecureCoding {
     encoder.encode(hometown, forKey: CodingKeys.hometown.rawValue)
     encoder.encode(location, forKey: CodingKeys.location.rawValue)
     encoder.encode(gender, forKey: CodingKeys.gender.rawValue)
+    encoder.encode(Array(permissions ?? []) as? NSArray, forKey: CodingKeys.permissions.rawValue)
   }
 
   enum CodingKeys: String, CodingKey {
@@ -175,7 +181,6 @@ extension Profile: NSSecureCoding {
     case hometown
     case location
     case gender
+    case permissions
   }
 }
-
-#endif

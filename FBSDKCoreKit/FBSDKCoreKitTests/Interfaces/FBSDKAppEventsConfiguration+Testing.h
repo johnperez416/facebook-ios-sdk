@@ -6,7 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#import "FBSDKAppEventsConfiguration.h"
+#import <FBSDKCoreKit/FBSDKAppEventsConfiguration.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -20,7 +20,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithDefaultATEStatus:(FBSDKAdvertisingTrackingStatus)defaultATEStatus
            advertiserIDCollectionEnabled:(BOOL)advertiserIDCollectionEnabled
                   eventCollectionEnabled:(BOOL)eventCollectionEnabled
-NS_SWIFT_NAME(init(defaultATEStatus:advertiserIDCollectionEnabled:eventCollectionEnabled:));
+                      iapObservationTime:(UInt64)iapObservationTime
+                 iapManualAndAutoLogDedupWindow:(UInt64)iapManualAndAutoLogDedupWindow
+                   iapProdDedupConfiguration:(NSDictionary<NSString *, NSArray<NSString *>*> *)iapProdDedupConfiguration
+               iapTestDedupConfiguration:(NSDictionary<NSString *, NSArray<NSString *>*> *)iapTestDedupConfiguration
+NS_SWIFT_NAME(init(defaultATEStatus:advertiserIDCollectionEnabled:eventCollectionEnabled:iapObservationTime:iapManualAndAutoLogDedupWindow:iapProdDedupConfiguration:iapTestDedupConfiguration:));
 // UNCRUSTIFY_FORMAT_ON
 
 @end

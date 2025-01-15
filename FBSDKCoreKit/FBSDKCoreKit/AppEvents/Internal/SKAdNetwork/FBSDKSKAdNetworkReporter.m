@@ -17,7 +17,6 @@
 #import "FBSDKGraphRequestFactoryProtocol.h"
 #import "FBSDKGraphRequestProtocol.h"
 #import "FBSDKSKAdNetworkConversionConfiguration.h"
-#import "FBSDKSettings.h"
 
 #define FBSDK_SKADNETWORK_CONFIG_TIME_OUT 86400
 
@@ -64,7 +63,6 @@ static char *const serialQueueLabel = "com.facebook.appevents.SKAdNetwork.FBSDKS
   if (@available(iOS 14.0, *)) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-      [SKAdNetwork registerAppForAdNetworkAttribution];
       [self _loadReportData];
       self.completionBlocks = [NSMutableArray new];
       self.serialQueue = dispatch_queue_create(serialQueueLabel, DISPATCH_QUEUE_SERIAL);
@@ -136,7 +134,12 @@ static char *const serialQueueLabel = "com.facebook.appevents.SKAdNetwork.FBSDKS
       return;
     }
     self.isRequestStarted = YES;
-    id<FBSDKGraphRequest> request = [self.graphRequestFactory createGraphRequestWithGraphPath:[NSString stringWithFormat:@"%@/ios_skadnetwork_conversion_config", FBSDKSettings.sharedSettings.appID]];
+    id<FBSDKGraphRequest> request = [self.graphRequestFactory createGraphRequestWithGraphPath:[NSString stringWithFormat:@"%@/ios_skadnetwork_conversion_config", FBSDKSettings.sharedSettings.appID]
+                                                                                   parameters:@{@"os_version" : UIDevice.currentDevice.systemVersion}
+                                                                                  tokenString:nil
+                                                                                   HTTPMethod:FBSDKHTTPMethodGET
+                                                                                        flags:FBSDKGraphRequestFlagNone
+                                                              useAlternativeDefaultDomainPrefix:NO];
     [request startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection, id result, NSError *error) {
       [self dispatchOnQueue:self.serialQueue block:^{
         if (error) {
@@ -232,7 +235,11 @@ static char *const serialQueueLabel = "com.facebook.appevents.SKAdNetwork.FBSDKS
     if ([self shouldCutoff]) {
       return;
     }
-    [self.conversionValueUpdater updateConversionValue:value];
+    if (@available(iOS 15.4, *)) {
+      [self.conversionValueUpdater updatePostbackConversionValue:value completionHandler:nil];
+    } else {
+      [self.conversionValueUpdater updateConversionValue:value];
+    }
     self.conversionValue = value + 1;
     self.timestamp = [NSDate date];
     [self _saveReportData];

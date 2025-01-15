@@ -8,19 +8,18 @@
 
 #import <AdSupport/AdSupport.h>
 
-#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 #import <objc/runtime.h>
 
 #import "FBSDKAppEventName+Internal.h"
-#import "FBSDKAppEventsConfiguration.h"
 #import "FBSDKDynamicFrameworkLoader.h"
 #import "FBSDKInternalUtility+Internal.h"
-#import "FBSDKSettings+Internal.h"
 
 #define FBSDK_APPEVENTSUTILITY_ANONYMOUSIDFILENAME @"com-facebook-sdk-PersistedAnonymousID.json"
 #define FBSDK_APPEVENTSUTILITY_ANONYMOUSID_KEY @"anon_id"
 #define FBSDK_APPEVENTSUTILITY_MAX_IDENTIFIER_LENGTH 40
+#define FBSDK_APPEVENTSUTILITY_CAMPAIGNIDS_KEY @"com.facebook.sdk.campaignids"
 
 @interface FBSDKAppEventsUtility ()
 
@@ -57,12 +56,14 @@ static FBSDKAppEventsUtility *_shared;
                                            settings:(id<FBSDKSettings>)settings
                                     internalUtility:(id<FBSDKInternalUtility>)internalUtility
                                        errorFactory:(id<FBSDKErrorCreating>)errorFactory
+                                          dataStore:(id<FBSDKDataPersisting>)dataStore
 {
   self.appEventsConfigurationProvider = appEventsConfigurationProvider;
   self.deviceInformationProvider = deviceInformationProvider;
   self.settings = settings;
   self.internalUtility = internalUtility;
   self.errorFactory = errorFactory;
+  self.dataStore = dataStore;
 }
 
 - (NSMutableDictionary<NSString *, NSString *> *)activityParametersDictionaryForEvent:(NSString *)eventCategory
@@ -80,7 +81,7 @@ static FBSDKAppEventsUtility *_shared;
   [FBSDKTypeUtility dictionary:parameters setObject:[FBSDKBasicUtility anonymousID] forKey:FBSDK_APPEVENTSUTILITY_ANONYMOUSID_KEY];
 
   FBSDKAdvertisingTrackingStatus advertisingTrackingStatus = self.settings.advertisingTrackingStatus;
-  if (advertisingTrackingStatus != FBSDKAdvertisingTrackingUnspecified) {
+  if (advertisingTrackingStatus != FBSDKAdvertisingTrackingUnspecified || [[FBSDKDomainHandler sharedInstance] isDomainHandlingEnabled]) {
     [FBSDKTypeUtility dictionary:parameters setObject:@(self.settings.isAdvertiserTrackingEnabled).stringValue forKey:@"advertiser_tracking_enabled"];
   }
 
@@ -94,11 +95,13 @@ static FBSDKAppEventsUtility *_shared;
   }
 
   [FBSDKTypeUtility dictionary:parameters setObject:@(!self.settings.isEventDataUsageLimited).stringValue forKey:@"application_tracking_enabled"];
-  [FBSDKTypeUtility dictionary:parameters setObject:@(self.settings.advertiserIDCollectionEnabled).stringValue forKey:@"advertiser_id_collection_enabled"];
+  [FBSDKTypeUtility dictionary:parameters setObject:@(self.settings.isAdvertiserIDCollectionEnabled).stringValue forKey:@"advertiser_id_collection_enabled"];
 
   if (userID) {
     [FBSDKTypeUtility dictionary:parameters setObject:userID forKey:@"app_user_id"];
   }
+    
+  [FBSDKTypeUtility dictionary:parameters setObject:[self getCampaignIDs] forKey:@"campaign_ids"];
 
   [self.internalUtility extendDictionaryWithDataProcessingOptions:parameters];
 
@@ -161,7 +164,7 @@ static FBSDKAppEventsUtility *_shared;
   }
 
   Class ASIdentifierManagerClass = [dynamicFrameworkResolver asIdentifierManagerClass];
-  ASIdentifierManager *manager = [ASIdentifierManagerClass sharedManager];
+  ASIdentifierManager *manager = (ASIdentifierManager *)[ASIdentifierManagerClass sharedManager];
   if (shouldUseCachedManager) {
     self.cachedAdvertiserIdentifierManager = manager;
   } else {
@@ -205,6 +208,35 @@ static FBSDKAppEventsUtility *_shared;
     FBSDKAppEventNameAdImpression,
     FBSDKAppEventNameAdClick
   ];
+}
+
+- (void)saveCampaignIDs:(NSURL *)url
+{
+  if (!url) {
+    return;
+  }
+  NSDictionary<NSString *, NSString *> *params = [FBSDKBasicUtility dictionaryWithQueryString:url.query];
+  NSString *applinkDataString = params[@"al_applink_data"];
+  if (!applinkDataString) {
+    return;
+  }
+
+  NSDictionary<id, id> *applinkData = [FBSDKTypeUtility dictionaryValue:[FBSDKBasicUtility objectForJSONString:applinkDataString error:NULL]];
+  if (!applinkData) {
+    return;
+  }
+    
+  NSString *campaignIDs = [FBSDKTypeUtility dictionary:applinkData objectForKey:@"campaign_ids" ofType:NSString.class];
+  if (!campaignIDs) {
+    return;
+  }
+    
+  [self.dataStore fb_setObject:campaignIDs forKey:FBSDK_APPEVENTSUTILITY_CAMPAIGNIDS_KEY];
+}
+
+- (nullable NSString *)getCampaignIDs
+{
+    return [FBSDKTypeUtility stringValueOrNil:[self.dataStore fb_objectForKey:FBSDK_APPEVENTSUTILITY_CAMPAIGNIDS_KEY]];
 }
 
 #pragma mark - Internal, for testing
@@ -341,26 +373,30 @@ static FBSDKAppEventsUtility *_shared;
 }
 
 // Given a candidate token (which may be nil), find the real token to string to use.
-// Precedence: 1) provided token, 2) current token, 3) app | client token, 4) fully anonymous session.
+// Precedence: 1) provided token, 2) current token only if ATE is true, 3) app | client token, 4) fully anonymous session.
 - (nullable NSString *)tokenStringToUseFor:(nullable FBSDKAccessToken *)token
                       loggingOverrideAppID:(nullable NSString *)loggingOverrideAppID
 {
-  if (!token) {
+  if (!token && (![[FBSDKDomainHandler sharedInstance] isDomainHandlingEnabled] || self.settings.isAdvertiserTrackingEnabled)) {
     token = FBSDKAccessToken.currentAccessToken;
+  }
+
+  if (token && token.isExpired) {
+    token = nil;
   }
 
   NSString *appID = loggingOverrideAppID ?: token.appID ?: self.settings.appID;
   NSString *tokenString = token.tokenString;
   NSString *clientTokenString = self.settings.clientToken;
 
-  if (![appID isEqualToString:token.appID]) {
+  if (!token || ![appID isEqualToString:token.appID]) {
     // If there's a logging override app id present
     // then we don't want to use the client token since the client token
     // is intended to match up with the primary app id
     // and AppEvents doesn't require a client token.
-    if (clientTokenString && loggingOverrideAppID) {
+    if (clientTokenString && loggingOverrideAppID && loggingOverrideAppID != self.settings.appID && loggingOverrideAppID != token.appID) {
       tokenString = nil;
-    } else if (clientTokenString && appID && ([appID isEqualToString:token.appID] || token == nil)) {
+    } else if (clientTokenString && appID && (token == nil || [appID isEqualToString:token.appID])) {
       tokenString = [NSString stringWithFormat:@"%@|%@", appID, clientTokenString];
     } else if (appID) {
       tokenString = nil;
@@ -479,6 +515,7 @@ static FBSDKAppEventsUtility *_shared;
   self.settings = nil;
   self.internalUtility = nil;
   self.errorFactory = nil;
+  self.dataStore = nil;
   self.cachedAdvertiserIdentifierManager = nil;
 }
 

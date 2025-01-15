@@ -23,9 +23,9 @@ final class EventDeactivationManager: _AppEventsParameterProcessing, _EventsProc
   private var deactivatedEvents = Set<String>()
   private var eventsWithDeactivatedParameters = [DeactivatedEvent]()
 
-  var configuredDependencies: InstanceDependencies?
+  var configuredDependencies: ObjectDependencies?
 
-  var defaultDependencies: InstanceDependencies? = InstanceDependencies(
+  var defaultDependencies: ObjectDependencies? = .init(
     serverConfigurationProvider: _ServerConfigurationManager.shared
   )
 
@@ -62,12 +62,13 @@ final class EventDeactivationManager: _AppEventsParameterProcessing, _EventsProc
 
   func processParameters(
     _ parameters: [AppEvents.ParameterName: Any]?,
-    eventName: AppEvents.Name
+    eventName: AppEvents.Name?
   ) -> [AppEvents.ParameterName: Any]? {
     guard isEventDeactivationEnabled,
           let parameters = parameters,
           !parameters.isEmpty,
-          !eventsWithDeactivatedParameters.isEmpty
+          !eventsWithDeactivatedParameters.isEmpty,
+          let eventName = eventName
     else {
       return parameters
     }
@@ -106,8 +107,8 @@ final class EventDeactivationManager: _AppEventsParameterProcessing, _EventsProc
   }
 }
 
-extension EventDeactivationManager: DependentAsInstance {
-  struct InstanceDependencies {
+extension EventDeactivationManager: DependentAsObject {
+  struct ObjectDependencies {
     var serverConfigurationProvider: _ServerConfigurationProviding
   }
 }

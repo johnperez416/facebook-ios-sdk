@@ -6,9 +6,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-import FBAEMKit
-#endif
+@testable import FBAEMKit
 
 final class CoreKitConfigurator: CoreKitConfiguring {
 
@@ -19,6 +17,7 @@ final class CoreKitConfigurator: CoreKitConfiguring {
   }
 
   func performConfiguration() {
+    configureSettings()
     configureAccessToken()
     configureAppEvents()
     configureAppEventsConfigurationManager()
@@ -34,11 +33,9 @@ final class CoreKitConfigurator: CoreKitConfiguring {
     configureInstrumentManager()
     configureInternalUtility()
     configureServerConfigurationManager()
-    configureSettings()
     configureCloudBridge()
-
-    #if !os(tvOS)
     configureAEMReporter()
+    configureAEMManager()
     configureNonTVOSAppEvents()
     configureAppLinkNavigation()
     configureAppLinkURL()
@@ -51,11 +48,10 @@ final class CoreKitConfigurator: CoreKitConfiguring {
     configureModelManager()
     configureProfile()
     configureWebDialogView()
-    #endif
+    configureDomainHandler()
+    configureGraphRequestQueue()
   }
 }
-
-// MARK: - All platforms
 
 // swiftformat:disable:next extensionaccesscontrol
 private extension CoreKitConfigurator {
@@ -66,6 +62,29 @@ private extension CoreKitConfigurator {
       graphRequestPiggybackManager: components.piggybackManager,
       errorFactory: components.errorFactory
     )
+  }
+
+  func configureAEMReporter() {
+    if #available(iOS 14, *) {
+      AEMReporter.configure(
+        networker: components.aemNetworker,
+        appID: components.settings.appID,
+        reporter: components.skAdNetworkReporter
+      )
+    }
+  }
+
+  func configureAEMManager() {
+    if #available(iOS 14, *) {
+      _AEMManager.shared.configure(
+        swizzler: components.swizzler,
+        reporter: components.aemReporter,
+        eventLogger: components.eventLogger,
+        crashHandler: components.crashHandler,
+        featureChecker: components.featureChecker,
+        appEventsUtility: components.appEventsUtility
+      )
+    }
   }
 
   func configureAppEvents() {
@@ -89,7 +108,18 @@ private extension CoreKitConfigurator {
       userDataStore: components.userDataStore,
       appEventsUtility: components.appEventsUtility,
       internalUtility: components.internalUtility,
-      capiReporter: components.capiReporter
+      capiReporter: components.capiReporter,
+      protectedModeManager: components.protectedModeManager,
+      bannedParamsManager: components.bannedParamsManager,
+      stdParamEnforcementManager: components.stdParamEnforcementManager,
+      macaRuleMatchingManager: components.macaRuleMatchingManager,
+      blocklistEventsManager: components.blocklistEventsManager,
+      redactedEventsManager: components.redactedEventsManager,
+      sensitiveParamsManager: components.sensitiveParamsManager,
+      transactionObserver: components.transactionObserver,
+      failedTransactionLoggingFactory: IAPTransactionLoggingFactory(),
+      iapDedupeProcessor: components.iapDedupeProcessor,
+      iapTransactionCache: components.iapTransactionCache
     )
   }
 
@@ -109,7 +139,9 @@ private extension CoreKitConfigurator {
   func configureAppEventsState() {
     _AppEventsState.eventProcessors = [
       components.eventDeactivationManager,
+      components.blocklistEventsManager,
       components.restrictiveDataFilterManager,
+      components.redactedEventsManager,
     ]
   }
 
@@ -119,12 +151,65 @@ private extension CoreKitConfigurator {
       deviceInformationProvider: components.deviceInformationProvider,
       settings: components.settings,
       internalUtility: components.internalUtility,
-      errorFactory: components.errorFactory
+      errorFactory: components.errorFactory,
+      dataStore: components.defaultDataStore
+    )
+  }
+
+  func configureAppLinkNavigation() {
+    AppLinkNavigation.setDependencies(
+      .init(
+        settings: components.settings,
+        urlOpener: components.internalURLOpener,
+        appLinkEventPoster: components.appLinkEventPoster,
+        appLinkResolver: components.appLinkResolver
+      )
+    )
+  }
+
+  func configureAppLinkURL() {
+    AppLinkURL.configure(
+      settings: components.settings,
+      appLinkFactory: components.appLinkFactory,
+      appLinkTargetFactory: components.appLinkTargetFactory,
+      appLinkEventPoster: components.appLinkEventPoster
+    )
+  }
+
+  func configureAppLinkUtility() {
+    AppLinkUtility.configure(
+      graphRequestFactory: components.graphRequestFactory,
+      infoDictionaryProvider: components.infoDictionaryProvider,
+      settings: components.settings,
+      appEventsConfigurationProvider: components.appEventsConfigurationProvider,
+      advertiserIDProvider: components.advertiserIDProvider,
+      appEventsDropDeterminer: components.appEventsDropDeterminer,
+      appEventParametersExtractor: components.appEventParametersExtractor,
+      appLinkURLFactory: components.appLinkURLFactory,
+      userIDProvider: components.userIDProvider,
+      userDataStore: components.userDataStore
+    )
+  }
+
+  func configureAuthenticationStatusUtility() {
+    _AuthenticationStatusUtility.configure(
+      profileSetter: components.profileSetter,
+      sessionDataTaskProvider: components.sessionDataTaskProvider,
+      accessTokenWallet: components.accessTokenWallet,
+      authenticationTokenWallet: components.authenticationTokenWallet
     )
   }
 
   func configureAuthenticationToken() {
     AuthenticationToken.tokenCache = components.tokenCache
+  }
+
+  func configureBridgeAPIRequest() {
+    _BridgeAPIRequest.configure(
+      internalURLOpener: components.internalURLOpener,
+      internalUtility: components.internalUtility,
+      settings: components.settings
+    )
   }
 
   func configureButton() {
@@ -133,6 +218,37 @@ private extension CoreKitConfigurator {
       eventLogger: components.eventLogger,
       accessTokenProvider: components.accessTokenWallet
     )
+  }
+
+  func configureCloudBridge() {
+    FBSDKAppEventsCAPIManager.shared.configure(
+      factory: components.graphRequestFactory,
+      settings: components.settings
+    )
+  }
+
+  func configureCodelessIndexer() {
+    _CodelessIndexer.configure(
+      graphRequestFactory: components.graphRequestFactory,
+      serverConfigurationProvider: components.serverConfigurationProvider,
+      dataStore: components.defaultDataStore,
+      graphRequestConnectionFactory: components.graphRequestConnectionFactory,
+      swizzler: components.swizzler,
+      settings: components.settings,
+      advertiserIDProvider: components.advertiserIDProvider
+    )
+  }
+
+  func configureCrashShield() {
+    _CrashShield.configure(
+      settings: components.settings,
+      graphRequestFactory: components.graphRequestFactory,
+      featureChecking: components.featureChecker
+    )
+  }
+
+  func configureFeatureExtractor() {
+    _FeatureExtractor.configure(rulesFromKeyProvider: components.rulesFromKeyProvider)
   }
 
   func configureGatekeeperManager() {
@@ -193,6 +309,33 @@ private extension CoreKitConfigurator {
     )
   }
 
+  func configureModelManager() {
+    let settings = components.settings
+    _ModelManager.shared.configure(
+      featureChecker: components.featureChecker,
+      graphRequestFactory: components.graphRequestFactory,
+      fileManager: components.fileManager,
+      store: components.defaultDataStore,
+      getAppID: { [settings] in settings.appID ?? "" },
+      dataExtractor: components.dataExtractor,
+      gateKeeperManager: components.gateKeeperManager,
+      suggestedEventsIndexer: components.suggestedEventsIndexer,
+      featureExtractor: components.featureExtractor
+    )
+  }
+
+  func configureNonTVOSAppEvents() {
+    AppEvents.shared.configureNonTVComponents(
+      onDeviceMLModelManager: components.modelManager,
+      metadataIndexer: components.metadataIndexer,
+      skAdNetworkReporter: components.skAdNetworkReporter,
+      skAdNetworkReporterV2: components.skAdNetworkReporterV2,
+      codelessIndexer: components.codelessIndexer,
+      swizzler: components.swizzler,
+      aemReporter: components.aemReporter
+    )
+  }
+
   func configureServerConfigurationManager() {
     _ServerConfigurationManager.shared.configure(
       graphRequestFactory: components.graphRequestFactory,
@@ -202,146 +345,17 @@ private extension CoreKitConfigurator {
   }
 
   func configureSettings() {
-    Settings.shared.configure(
-      store: components.defaultDataStore,
-      appEventsConfigurationProvider: components.appEventsConfigurationProvider,
-      infoDictionaryProvider: components.infoDictionaryProvider,
-      eventLogger: components.eventLogger
-    )
-  }
-
-  func configureCloudBridge() {
-    FBSDKAppEventsCAPIManager.shared.configure(
-      factory: components.graphRequestFactory,
-      settings: components.settings
-    )
-  }
-
-  // MARK: - Non-tvOS
-
-  #if !os(tvOS)
-
-  @available(tvOS, unavailable)
-  func configureAEMReporter() {
-    if #available(iOS 14, *) {
-      AEMReporter.configure(
-        networker: components.aemNetworker,
-        appID: components.settings.appID,
-        reporter: components.skAdNetworkReporter
+    Settings.shared.setDependencies(
+      .init(
+        appEventsConfigurationProvider: components.appEventsConfigurationProvider,
+        serverConfigurationProvider: components.serverConfigurationProvider,
+        dataStore: components.defaultDataStore,
+        eventLogger: components.eventLogger,
+        infoDictionaryProvider: components.infoDictionaryProvider
       )
-    }
-  }
-
-  @available(tvOS, unavailable)
-  func configureNonTVOSAppEvents() {
-    AppEvents.shared.configureNonTVComponents(
-      onDeviceMLModelManager: components.modelManager,
-      metadataIndexer: components.metadataIndexer,
-      skAdNetworkReporter: components.skAdNetworkReporter,
-      codelessIndexer: components.codelessIndexer,
-      swizzler: components.swizzler,
-      aemReporter: components.aemReporter
     )
   }
 
-  @available(tvOS, unavailable)
-  func configureAppLinkNavigation() {
-    AppLinkNavigation.configure(
-      settings: components.settings,
-      urlOpener: components.internalURLOpener,
-      appLinkEventPoster: components.appLinkEventPoster,
-      appLinkResolver: components.appLinkResolver
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureAppLinkURL() {
-    AppLinkURL.configure(
-      settings: components.settings,
-      appLinkFactory: components.appLinkFactory,
-      appLinkTargetFactory: components.appLinkTargetFactory,
-      appLinkEventPoster: components.appLinkEventPoster
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureAppLinkUtility() {
-    AppLinkUtility.configure(
-      graphRequestFactory: components.graphRequestFactory,
-      infoDictionaryProvider: components.infoDictionaryProvider,
-      settings: components.settings,
-      appEventsConfigurationProvider: components.appEventsConfigurationProvider,
-      advertiserIDProvider: components.advertiserIDProvider,
-      appEventsDropDeterminer: components.appEventsDropDeterminer,
-      appEventParametersExtractor: components.appEventParametersExtractor,
-      appLinkURLFactory: components.appLinkURLFactory,
-      userIDProvider: components.userIDProvider,
-      userDataStore: components.userDataStore
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureAuthenticationStatusUtility() {
-    _AuthenticationStatusUtility.configure(
-      profileSetter: components.profileSetter,
-      sessionDataTaskProvider: components.sessionDataTaskProvider,
-      accessTokenWallet: components.accessTokenWallet,
-      authenticationTokenWallet: components.authenticationTokenWallet
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureBridgeAPIRequest() {
-    _BridgeAPIRequest.configure(
-      internalURLOpener: components.internalURLOpener,
-      internalUtility: components.internalUtility,
-      settings: components.settings
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureCodelessIndexer() {
-    _CodelessIndexer.configure(
-      graphRequestFactory: components.graphRequestFactory,
-      serverConfigurationProvider: components.serverConfigurationProvider,
-      dataStore: components.defaultDataStore,
-      graphRequestConnectionFactory: components.graphRequestConnectionFactory,
-      swizzler: components.swizzler,
-      settings: components.settings,
-      advertiserIDProvider: components.advertiserIDProvider
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureCrashShield() {
-    _CrashShield.configure(
-      settings: components.settings,
-      graphRequestFactory: components.graphRequestFactory,
-      featureChecking: components.featureChecker
-    )
-  }
-
-  @available(tvOS, unavailable)
-  func configureFeatureExtractor() {
-    _FeatureExtractor.configure(rulesFromKeyProvider: components.rulesFromKeyProvider)
-  }
-
-  @available(tvOS, unavailable)
-  func configureModelManager() {
-    _ModelManager.shared.configure(
-      featureChecker: components.featureChecker,
-      graphRequestFactory: components.graphRequestFactory,
-      fileManager: components.fileManager,
-      store: components.defaultDataStore,
-      settings: components.settings,
-      dataExtractor: components.dataExtractor,
-      gateKeeperManager: components.gateKeeperManager,
-      suggestedEventsIndexer: components.suggestedEventsIndexer,
-      featureExtractor: components.featureExtractor
-    )
-  }
-
-  @available(tvOS, unavailable)
   func configureProfile() {
     Profile.setDependencies(
       .init(
@@ -355,7 +369,6 @@ private extension CoreKitConfigurator {
     )
   }
 
-  @available(tvOS, unavailable)
   func configureWebDialogView() {
     FBWebDialogView.configure(
       webViewProvider: components.webViewProvider,
@@ -364,5 +377,22 @@ private extension CoreKitConfigurator {
     )
   }
 
-  #endif
+  func configureDomainHandler() {
+    _DomainHandler.sharedInstance().configure(
+      domainConfigurationProvider: _DomainConfigurationManager.sharedInstance(),
+      settings: components.settings,
+      dataStore: components.defaultDataStore,
+      graphRequestFactory: components.graphRequestFactory,
+      graphRequestConnectionFactory: components.graphRequestConnectionFactory
+    )
+    _DomainConfiguration.setDefaultDomainInfo()
+
+    components.internalUtility.validateDomainConfiguration()
+  }
+
+  func configureGraphRequestQueue() {
+    GraphRequestQueue.sharedInstance().configure(
+      graphRequestConnectionFactory: components.graphRequestConnectionFactory
+    )
+  }
 }

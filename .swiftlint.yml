@@ -33,6 +33,8 @@ file_name:
     ShareDialogMode.swift,
     LoginAppEventNames.swift,
     FBSDKAppEventConversionsAPITransformer.swift,
+    AppLinkNavigationTestDependencies.swift,
+    ValueClamping.swift,
   ]
 trailing_comma:
   mandatory_comma: true

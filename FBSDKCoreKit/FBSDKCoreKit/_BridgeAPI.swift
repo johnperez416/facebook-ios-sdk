@@ -6,8 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#if !os(tvOS)
-
 import AuthenticationServices
 import SafariServices
 
@@ -22,7 +20,6 @@ public final class _BridgeAPI: NSObject,
   URLOpener,
   BridgeAPIRequestOpening,
   _ContainerViewControllerDelegate,
-  ASWebAuthenticationPresentationContextProviding,
   SFSafariViewControllerDelegate {
 
   private enum Values {
@@ -513,10 +510,9 @@ extension _BridgeAPI {
 
 // MARK: ASWebAuthenticationPresentationContextProviding Conformance
 
-extension _BridgeAPI {
+@available(iOS 13, *)
+extension _BridgeAPI: ASWebAuthenticationPresentationContextProviding {
   public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
     UIApplication.shared.keyWindow ?? ASPresentationAnchor()
   }
 }
-
-#endif

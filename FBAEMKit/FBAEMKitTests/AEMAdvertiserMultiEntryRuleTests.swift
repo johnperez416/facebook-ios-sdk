@@ -11,8 +11,6 @@
 import TestTools
 import XCTest
 
-#if !os(tvOS)
-
 final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
 
   enum Keys {
@@ -21,7 +19,7 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
   }
 
   func testIsMatchedEventParametersForAnd() {
-    let rule = _AEMAdvertiserMultiEntryRule(
+    let rule = AEMAdvertiserMultiEntryRule(
       with: .and,
       rules: [SampleAEMSingleEntryRules.cardTypeRule1, SampleAEMSingleEntryRules.valueRule]
     )
@@ -55,7 +53,7 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
   }
 
   func testIsMatchedEventParametersForOr() {
-    let rule = _AEMAdvertiserMultiEntryRule(
+    let rule = AEMAdvertiserMultiEntryRule(
       with: .or,
       rules: [SampleAEMSingleEntryRules.cardTypeRule1, SampleAEMSingleEntryRules.valueRule]
     )
@@ -89,7 +87,7 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
   }
 
   func testIsMatchedEventParametersForNot() {
-    let rule = _AEMAdvertiserMultiEntryRule(
+    let rule = AEMAdvertiserMultiEntryRule(
       with: .not,
       rules: [SampleAEMSingleEntryRules.cardTypeRule1, SampleAEMSingleEntryRules.valueRule]
     )
@@ -123,15 +121,15 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
   }
 
   func testIsMatchedEventParametersForNestedRules() {
-    let andRule = _AEMAdvertiserMultiEntryRule(
+    let andRule = AEMAdvertiserMultiEntryRule(
       with: .and,
       rules: [SampleAEMSingleEntryRules.cardTypeRule2, SampleAEMSingleEntryRules.valueRule]
     )
-    let orRule = _AEMAdvertiserMultiEntryRule(
+    let orRule = AEMAdvertiserMultiEntryRule(
       with: .or,
       rules: [SampleAEMSingleEntryRules.contentNameRule, SampleAEMSingleEntryRules.contentCategoryRule]
     )
-    let nestedRule = _AEMAdvertiserMultiEntryRule(
+    let nestedRule = AEMAdvertiserMultiEntryRule(
       with: .and,
       rules: [andRule, orRule, SampleAEMSingleEntryRules.urlRule]
     )
@@ -172,7 +170,7 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
 
   func testSecureCoding() {
     XCTAssertTrue(
-      _AEMAdvertiserMultiEntryRule.supportsSecureCoding,
+      AEMAdvertiserMultiEntryRule.supportsSecureCoding,
       "AEM Advertiser Multi Entry Rule should support secure coding"
     )
   }
@@ -188,10 +186,10 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
     // Test Properties
     XCTAssertEqual(decodedObject.operator.rawValue, entryRule.operator.rawValue)
     let rules = try XCTUnwrap(
-      entryRule.rules as? [_AEMAdvertiserSingleEntryRule]
+      entryRule.rules as? [AEMAdvertiserSingleEntryRule]
     )
     let decodedRules = try XCTUnwrap(
-      decodedObject.rules as? [_AEMAdvertiserSingleEntryRule]
+      decodedObject.rules as? [AEMAdvertiserSingleEntryRule]
     )
     XCTAssertEqual(decodedRules, rules)
   }
@@ -202,5 +200,3 @@ final class AEMAdvertiserMultiEntryRuleTests: XCTestCase {
 extension String {
   fileprivate static let isCodable = "AEMAdvertiserMultiEntryRule should be encodable and decodable"
 }
-
-#endif

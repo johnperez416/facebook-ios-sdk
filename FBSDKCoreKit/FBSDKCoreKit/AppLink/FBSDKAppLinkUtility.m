@@ -10,13 +10,12 @@
 
 #import "FBSDKAppLinkUtility+Internal.h"
 
-#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKCoreKit/FBSDKCoreKit-Swift.h>
 #import <FBSDKCoreKit_Basics/FBSDKCoreKit_Basics.h>
 
 #import "FBSDKGraphRequestFactoryProtocol.h"
 #import "FBSDKGraphRequestHTTPMethod.h"
 #import "FBSDKGraphRequestProtocol.h"
-#import "FBSDKSettingsProtocol.h"
 
 static NSString *const FBSDKLastDeferredAppLink = @"com.facebook.sdk:lastDeferredAppLink%@";
 static NSString *const FBSDKDeferredAppLinkEvent = @"DEFERRED_APP_LINK";
@@ -221,7 +220,9 @@ static BOOL _isConfigured = NO;
                                                                                                   parameters:deferredAppLinkParameters
                                                                                                  tokenString:nil
                                                                                                      version:nil
-                                                                                                  HTTPMethod:FBSDKHTTPMethodPOST];
+                                                                                                  HTTPMethod:FBSDKHTTPMethodPOST
+                                                                                                forAppEvents:YES
+                                                                           useAlternativeDefaultDomainPrefix:NO];
     [deferredAppLinkRequest startWithCompletion:^(id<FBSDKGraphRequestConnecting> connection,
                                                   id result,
                                                   NSError *error) {

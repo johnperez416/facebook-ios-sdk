@@ -59,10 +59,13 @@ public final class ApplicationDelegate: NSObject {
    controlled via the 'FacebookAutoLogAppEventsEnabled' key in your project's Info.plist file.
    */
   public func initializeSDK() {
-    initializeSDK(launchOptions: [:])
+    initializeSDK(launchOptions: [:], completionBlock: nil)
   }
 
-  func initializeSDK(launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
+  func initializeSDK(
+    launchOptions: [UIApplication.LaunchOptionsKey: Any]?,
+    completionBlock: _DomainConfigurationBlock?
+  ) {
     guard !hasInitializeBeenCalled else { return }
 
     hasInitializeBeenCalled = true
@@ -70,7 +73,23 @@ public final class ApplicationDelegate: NSObject {
     // DO NOT MOVE THIS CALL
     // Dependencies MUST be configured before they are used
     configurator.performConfiguration()
+    initializeTokenCache()
+    initializeProfile()
+    if #available(iOS 14.5, *) {
+      fetchDomainConfiguration {
+        GraphRequestConnection.setDidFetchDomainConfiguration()
+        self.doSDKSetup(launchOptions: launchOptions, completionBlock: completionBlock)
+        GraphRequestQueue.sharedInstance().flush() // Flush any queued requests
+      }
+    } else {
+      doSDKSetup(launchOptions: launchOptions, completionBlock: completionBlock)
+    }
+  }
 
+  private func doSDKSetup(
+    launchOptions: [UIApplication.LaunchOptionsKey: Any]?,
+    completionBlock: _DomainConfigurationBlock?
+  ) {
     logInitialization()
     addObservers()
     components.appEvents.startObservingApplicationLifecycleNotifications()
@@ -78,15 +97,14 @@ public final class ApplicationDelegate: NSObject {
     handleDeferredActivationIfNeeded()
     enableInstrumentation()
 
-    #if !os(tvOS)
     logBackgroundRefreshStatus()
     initializeAppLink()
-    #endif
+    initializeAEMAutoSetup()
 
     configureSourceApplication(launchOptions: launchOptions)
+    completionBlock?()
   }
 
-  @available(tvOS, unavailable)
   private func initializeAppLink() {
     initializeMeasurementListener()
     logIfAutoAppLinkEnabled()
@@ -113,20 +131,33 @@ public final class ApplicationDelegate: NSObject {
     components.internalUtility.validateFacebookReservedURLSchemes()
   }
 
-  @available(tvOS, unavailable)
   private func initializeMeasurementListener() {
-    #if !os(tvOS)
     // Register Listener for App Link measurement events
     _MeasurementEventListener(eventLogger: components.appEvents, sourceApplicationTracker: components.appEvents)
       .registerForAppLinkMeasurementEvents()
-    #endif
   }
 
-  @available(tvOS, unavailable)
+  private func initializeAEMAutoSetup() {
+    guard
+      #available(iOS 14.0, *)
+    else {
+      return
+    }
+
+    let flag = components.infoDictionaryProvider.fb_object(forInfoDictionaryKey: "FBSDKAemAutoSetupEnabled") as? Bool
+    let enabled = flag ?? true
+    if !enabled {
+      components.aemManager.logAutoSetupStatus(false, source: "client_flag")
+    }
+    if enabled, components.featureChecker.isEnabled(.aemAutoSetup) {
+      components.aemManager.enable(
+        components.featureChecker.isEnabled(.aemAutoSetupProxy)
+      )
+    }
+  }
+
   private func logBackgroundRefreshStatus() {
-    #if !os(tvOS)
     components.backgroundEventLogger.logBackgroundRefreshStatus(UIApplication.shared.backgroundRefreshStatus)
-    #endif
   }
 
   private func logInitialization() {
@@ -163,9 +194,7 @@ public final class ApplicationDelegate: NSObject {
       object: nil
     )
 
-    #if !os(tvOS)
     addObserver(_BridgeAPI.shared)
-    #endif
   }
 
   // MARK: - UIApplicationDelegate-like interface
@@ -245,7 +274,6 @@ public final class ApplicationDelegate: NSObject {
   ) -> Bool {
     components.appEvents.setSourceApplication(sourceApplication, open: url)
 
-    #if !os(tvOS)
     components.featureChecker.check(.AEM) { enabled in
       guard enabled else { return }
 
@@ -257,7 +285,6 @@ public final class ApplicationDelegate: NSObject {
       AEMReporter.enable()
       AEMReporter.handle(url)
     }
-    #endif
 
     var handled = false
     applicationObservers.allObjects.forEach { observer in
@@ -273,6 +300,7 @@ public final class ApplicationDelegate: NSObject {
       }
     }
 
+    components.appEventsUtility.saveCampaignIDs(url)
     if handled {
       return true
     } else {
@@ -293,10 +321,7 @@ public final class ApplicationDelegate: NSObject {
      - application: The application as passed to `UIApplicationDelegate.application(_:didFinishLaunchingWithOptions:)`.
      - launchOptions: The launch options as passed to `UIApplicationDelegate.application(_:didFinishLaunchingWithOptions:)`.
 
-   - Returns: `true` if there are any added application observers that themselves return true from calling `application(_:didFinishLaunchingWithOptions:)`.
-     Otherwise will return `false`.
-
-   - Note: If this method is called after calling `initializeSDK`, then the return value will always be `false`.
+   - Returns: `true`
    */
   @discardableResult
   public func application(
@@ -308,22 +333,19 @@ public final class ApplicationDelegate: NSObject {
       !hasInitializeBeenCalled
     else { return false }
 
-    initializeSDK(launchOptions: launchOptions)
-    isAppLaunched = true
+    initializeSDK(launchOptions: launchOptions) {
+      self.isAppLaunched = true
 
-    initializeTokenCache()
-    fetchServerConfiguration()
+      self.fetchServerConfiguration()
 
-    if components.settings.isAutoLogAppEventsEnabled {
-      logSDKInitialize()
+      if self.components.settings.isAutoLogAppEventsEnabled {
+        self.logSDKInitialize()
+      }
+
+      self.checkAuthentication()
+      _ = self.notifyLaunchObservers(application: application, launchOptions: launchOptions)
     }
-
-    #if !os(tvOS)
-    initializeProfile()
-    checkAuthentication()
-    #endif
-
-    return notifyLaunchObservers(application: application, launchOptions: launchOptions)
+    return true
   }
 
   private func initializeTokenCache() {
@@ -334,19 +356,17 @@ public final class ApplicationDelegate: NSObject {
     components.serverConfigurationProvider.loadServerConfiguration(completionBlock: nil)
   }
 
-  @available(tvOS, unavailable)
-  private func initializeProfile() {
-    #if !os(tvOS)
-    components.profileSetter.current = components.profileSetter.fetchCachedProfile()
-    #endif
+  private func fetchDomainConfiguration(completionBlock: _DomainConfigurationBlock?) {
+    _DomainHandler.sharedInstance().loadDomainConfiguration(completionBlock: completionBlock)
   }
 
-  @available(tvOS, unavailable)
+  private func initializeProfile() {
+    components.profileSetter.current = components.profileSetter.fetchCachedProfile()
+  }
+
   private func checkAuthentication() {
-    #if !os(tvOS)
     components.authenticationTokenWallet.current = components.authenticationTokenWallet.tokenCache?.authenticationToken
     _AuthenticationStatusUtility.checkAuthenticationStatus()
-    #endif
   }
 
   private func notifyLaunchObservers(
@@ -375,6 +395,10 @@ public final class ApplicationDelegate: NSObject {
     applicationObservers.allObjects.forEach { observer in
       observer.applicationDidEnterBackground?(notification.object as? UIApplication)
     }
+    IAPTransactionCache.shared.trimIfNeeded()
+    if IAPDedupeProcessor.shared.isEnabled {
+      IAPDedupeProcessor.shared.saveNonProcessedEvents()
+    }
   }
 
   func applicationDidBecomeActive(_ notification: Notification?) {
@@ -385,12 +409,19 @@ public final class ApplicationDelegate: NSObject {
       components.appEvents.activateApp()
     }
 
-    #if !os(tvOS)
-    components.skAdNetworkReporter?.checkAndRevokeTimer()
-    #endif
+    if components.featureChecker.isEnabled(.skAdNetworkV4) {
+      components.skAdNetworkReporterV2?.checkAndRevokeTimer()
+    } else {
+      components.skAdNetworkReporter?.checkAndRevokeTimer()
+    }
 
     applicationObservers.allObjects.forEach { observer in
       observer.applicationDidBecomeActive?(notification?.object as? UIApplication)
+    }
+    if #available(iOS 15.0, *) {
+      Task {
+        await IAPTransactionObserver.shared.observeNewTransactions()
+      }
     }
   }
 
@@ -487,9 +518,7 @@ public final class ApplicationDelegate: NSObject {
     }
   }
 
-  @available(tvOS, unavailable)
   private func logIfAutoAppLinkEnabled() {
-    #if !os(tvOS)
     let enabled = components.infoDictionaryProvider.fb_object(forInfoDictionaryKey: "FBSDKAutoAppLinkEnabled") as? Bool
     if enabled ?? false {
       var parameters = [AppEvents.ParameterName: Any]()
@@ -505,7 +534,6 @@ public final class ApplicationDelegate: NSObject {
         isImplicitlyLogged: true
       )
     }
-    #endif
   }
 
   // MARK: - Testability

@@ -6,12 +6,12 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import FBAEMKit
+@testable import FBAEMKit
 import Foundation
 
 enum SampleAEMMultiEntryRules {
 
-  private static let factory = _AEMAdvertiserRuleFactory()
+  private static let factory = AEMAdvertiserRuleFactory()
 
   static let contentRule =
     factory.createRule(json: #"{"or": [{"fb_content[*].id": {"eq": "12345"}}]}"#)! // swiftlint:disable:this line_length force_unwrapping

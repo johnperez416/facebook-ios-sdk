@@ -27,11 +27,7 @@ enum DeviceRequestsHelper {
 
     static let header = "fbsdk"
 
-    #if !os(tvOS)
     static let flavor = "ios"
-    #else
-    static let flavor = "tvos"
-    #endif
 
     static let sdkVersion: String = {
       var sdkVersion = Settings.shared.sdkVersion.replacingOccurrences(of: ".", with: "|")
@@ -90,7 +86,6 @@ enum DeviceRequestsHelper {
     )
     mdnsAdvertisementService.delegate = delegate
     mdnsAdvertisementService.publish(options: [.noAutoRename, .listenForConnections])
-    AppEvents.shared.logInternalEvent(.smartLoginService, parameters: [:], isImplicitlyLogged: true)
     mdnsAdvertisementServices.setObject(mdnsAdvertisementService, forKey: delegate)
     return true
   }

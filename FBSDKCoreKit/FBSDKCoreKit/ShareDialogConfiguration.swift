@@ -21,12 +21,11 @@ public enum DialogConfigurationName {
 
  Internal Use Only
  */
-@available(tvOS, unavailable)
 public struct ShareDialogConfiguration {
 
-  var configuredDependencies: InstanceDependencies?
+  var configuredDependencies: ValueDependencies?
 
-  var defaultDependencies: InstanceDependencies? = InstanceDependencies(
+  var defaultDependencies: ValueDependencies? = .init(
     serverConfigurationProvider: _ServerConfigurationManager.shared
   )
 
@@ -55,9 +54,8 @@ public struct ShareDialogConfiguration {
   }
 }
 
-@available(tvOS, unavailable)
-extension ShareDialogConfiguration: DependentAsInstance {
-  struct InstanceDependencies {
+extension ShareDialogConfiguration: DependentAsValue {
+  struct ValueDependencies {
     var serverConfigurationProvider: _ServerConfigurationProviding
   }
 }
